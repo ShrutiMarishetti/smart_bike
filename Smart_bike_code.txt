@@ -1,0 +1,190 @@
+
+#include <Adafruit_Fingerprint.h>
+SoftwareSerial mySerial(2,3);
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+const int AOUTpin=0;//the AOUT pin of the alcohol sensor goes into analog pin A0 of the
+arduino
+const int DOUTpin=8;//the DOUT pin of the alcohol sensor goes into digital pin D8 of the
+arduino
+const int ledPin=9;//the anode of the LED connects to digital pin D13 of the arduino
+const int standout=10;
+const int helmetout=11;
+const int alcohol_condition=4;
+const int stand_condition=5;
+const int helmet_condition=6;
+const int start_condition=7;
+int limit;
+int value;
+void setup()
+{
+ Serial.begin(9600);//sets the baud rate
+ pinMode(DOUTpin, INPUT);//sets the pin as an input to the
+ pinMode(ledPin, OUTPUT);
+ pinMode(standout,INPUT);
+ pinMode(helmetout,INPUT);
+ pinMode(alcohol_condition, OUTPUT);
+ pinMode(stand_condition, OUTPUT);
+ pinMode(helmet_condition, OUTPUT);
+ pinMode(start_condition, OUTPUT);
+ digitalWrite(standout,HIGH);//sets the pin as an output of the arduino
+ digitalWrite(helmetout,HIGH);
+ digitalWrite(ledPin,HIGH);
+ digitalWrite(alcohol_condition,LOW);
+ digitalWrite(stand_condition,LOW);
+ digitalWrite(helmet_condition,LOW);
+ digitalWrite(start_condition,LOW);
+ while (!Serial); // For Yun/Leo/Micro/Zero/...
+ delay(100);
+ Serial.println("\n\nAdafruit finger detect test");
+ // set the data rate for the sensor serial port
+ finger.begin(57600);
+ delay(5);
+ if (finger.verifyPassword())
+ {
+ Serial.println("Found fingerprint sensor!");
+ }
+ else
+ {
+ Serial.println("Did not find fingerprint sensor :(");
+ while (1) { delay(1); }
+ }
+ finger.getTemplateCount();
+ Serial.print("Sensor contains ");
+ Serial.print(finger.templateCount);
+ Serial.println(" templates");
+ Serial.println("Waiting for valid finger...");
+}
+void loop() // run over and over again
+{
+ int a,stand,helmet;
+ a=getFingerprintIDez();
+ value= analogRead(AOUTpin);//reads the analaog
+ limit= digitalRead(DOUTpin);//reads the digital
+ stand= digitalRead(standout);
+ helmet= digitalRead(helmetout);
+ Serial.print("a=");
+ Serial.println(a);
+ Serial.print("stand= ");
+ Serial.println(stand);
+ Serial.print("helmet= ");
+ Serial.println(helmet);
+ Serial.print("Alcohol value= ");
+ Serial.println(value);//prints the alcohol value
+ Serial.print("Limit= ");
+ Serial.println(limit);//prints the limit reached as either LOW or HIGH (above or underneath)
+ delay(1000);
+ if(limit==LOW)
+ {
+ digitalWrite(alcohol_condition,HIGH);
+ }
+ if(limit==HIGH)
+ {
+ digitalWrite(alcohol_condition,LOW);
+ }
+ if(stand==HIGH)
+ {
+ digitalWrite(stand_condition,HIGH);
+ }
+ if(stand==LOW)
+ {
+ digitalWrite(stand_condition,LOW);
+ }
+ if(helmet==LOW)
+ {
+ digitalWrite(helmet_condition,HIGH);
+ }
+ if(helmet==HIGH)
+ {
+ digitalWrite(helmet_condition,LOW);
+ }
+ if (limit ==HIGH && stand==LOW && helmet==HIGH)
+ {
+ digitalWrite(start_condition,HIGH);
+ }
+ if (a == 2 && limit ==HIGH && stand==LOW && helmet==HIGH)
+ {
+ digitalWrite(ledPin,LOW);
+ }
+ else if(limit == LOW || stand==HIGH || helmet == LOW)
+ {
+ // digitalWrite(ledPin,HIGH);
+ digitalWrite(start_condition,LOW);
+ }
+ delay(50); //don't ned to run this at full speed.
+}
+uint8_t getFingerprintID() {
+ uint8_t p = finger.getImage();
+ switch (p) {
+ case FINGERPRINT_OK:
+ Serial.println("Image taken");
+ break;
+ case FINGERPRINT_NOFINGER:
+ Serial.println("No finger detected");
+ return p;
+ case FINGERPRINT_PACKETRECIEVEERR:
+ Serial.println("Communication error");
+ return p;
+ case FINGERPRINT_IMAGEFAIL:
+ Serial.println("Imaging error");
+ return p;
+ default:
+ Serial.println("Unknown error");
+ return p;
+ }
+ // OK success!
+ p = finger.image2Tz();
+ switch (p) {
+ case FINGERPRINT_OK:
+ Serial.println("Image converted");
+ break;
+ case FINGERPRINT_IMAGEMESS:
+ Serial.println("Image too messy");
+ return p;
+ case FINGERPRINT_PACKETRECIEVEERR:
+ Serial.println("Communication error");
+ return p;
+ case FINGERPRINT_FEATUREFAIL:
+ Serial.println("Could not find fingerprint features");
+ return p;
+ case FINGERPRINT_INVALIDIMAGE:
+ Serial.println("Could not find fingerprint features");
+ return p;
+ default:
+ Serial.println("Unknown error");
+ return p;
+ }
+
+ // OK converted!
+ p = finger.fingerFastSearch();
+ if (p == FINGERPRINT_OK) {
+ Serial.println("Found a print match!");
+ } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+ Serial.println("Communication error");
+ return p;
+ } else if (p == FINGERPRINT_NOTFOUND) {
+ Serial.println("Did not find a match");
+ return p;
+ } else {
+ Serial.println("Unknown error");
+ return p;
+ }
+
+ // found a match!
+ Serial.print("Found ID #"); Serial.print(finger.fingerID);
+ Serial.print(" with confidence of "); Serial.println(finger.confidence);
+ return finger.fingerID;
+}
+// returns -1 if failed, otherwise returns ID #
+int getFingerprintIDez() {
+ uint8_t p = finger.getImage();
+ if (p != FINGERPRINT_OK) return -1;
+ p = finger.image2Tz();
+ if (p != FINGERPRINT_OK) return -1;
+ p = finger.fingerFastSearch();
+ if (p != FINGERPRINT_OK) return -1;
+
+ // found a match!
+ Serial.print("Found ID #"); Serial.print(finger.fingerID);
+ Serial.print(" with confidence of "); Serial.println(finger.confidence);
+ return finger.fingerID;
+}
